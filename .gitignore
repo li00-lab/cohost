@@ -1,0 +1,41 @@
+# ── OS ──────────────────────────────────────────────────────────────
+.DS_Store
+*.pem
+
+# ── Secrets ──────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Frontend (Next.js) ───────────────────────────────────────────────
+cohost-frontend/node_modules/
+cohost-frontend/.next/
+cohost-frontend/out/
+cohost-frontend/build/
+cohost-frontend/coverage/
+cohost-frontend/.pnp
+cohost-frontend/.pnp.*
+cohost-frontend/.yarn/*
+!cohost-frontend/.yarn/patches
+!cohost-frontend/.yarn/plugins
+!cohost-frontend/.yarn/releases
+!cohost-frontend/.yarn/versions
+cohost-frontend/.vercel
+cohost-frontend/*.tsbuildinfo
+cohost-frontend/next-env.d.ts
+
+# ── Agent (Python) ───────────────────────────────────────────────────
+cohost-agent/__pycache__/
+cohost-agent/**/__pycache__/
+cohost-agent/*.pyc
+cohost-agent/*.pyo
+cohost-agent/.venv/
+cohost-agent/venv/
+cohost-agent/*.egg-info/
+cohost-agent/dist/
+
+# ── Logs ─────────────────────────────────────────────────────────────
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
