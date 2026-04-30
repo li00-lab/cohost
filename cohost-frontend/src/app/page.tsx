@@ -4,6 +4,17 @@ import { useState, useRef, useEffect } from "react";
 import { useCohostStore } from "@/lib/store";
 import Renderer from "@/components/Renderer";
 
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="16" height="16" viewBox="0 0 16 16" fill="none"
+      className={`transition-transform duration-300 ${open ? "" : "rotate-180"}`}
+    >
+      <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 type Message = { role: "user" | "assistant"; content: string };
 type StreamStatus = "thinking" | "generating" | null;
 
@@ -13,6 +24,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [streamingStatus, setStreamingStatus] = useState<StreamStatus>(null);
   const [streamingContent, setStreamingContent] = useState("");
+  const [chatOpen, setChatOpen] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const setData = useCohostStore((s) => s.setData);
@@ -109,9 +121,13 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex h-screen bg-zinc-950 text-white">
+    <div className="flex h-screen bg-zinc-950 text-white overflow-hidden">
       {/* ── Chat panel ── */}
-      <div className="flex flex-col w-1/2 border-r border-zinc-800">
+      <div
+        className={`flex flex-col border-r border-zinc-800 transition-all duration-300 shrink-0 ${
+          chatOpen ? "w-[420px]" : "w-0 border-r-0 overflow-hidden"
+        }`}
+      >
         <header className="px-6 py-4 border-b border-zinc-800 shrink-0">
           <h1 className="text-base font-semibold tracking-tight">Cohost</h1>
           <p className="text-xs text-zinc-500 mt-0.5">AI Travel Planner · Google ADK</p>
@@ -194,11 +210,20 @@ export default function HomePage() {
       </div>
 
       {/* ── Itinerary preview panel ── */}
-      <div className="flex flex-col w-1/2">
-        <header className="px-6 py-4 border-b border-zinc-800 shrink-0 flex items-center">
+      <div className="flex flex-col flex-1 min-w-0">
+        <header className="px-6 py-4 border-b border-zinc-800 shrink-0 flex items-center gap-3">
+          {/* Collapse / expand toggle */}
+          <button
+            onClick={() => setChatOpen((o) => !o)}
+            title={chatOpen ? "Collapse chat" : "Expand chat"}
+            className="flex items-center justify-center w-7 h-7 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors shrink-0"
+          >
+            <ChevronIcon open={chatOpen} />
+          </button>
+
           <div>
             <h2 className="text-base font-semibold tracking-tight">Itinerary</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Live A2UI Render</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Click any item to edit</p>
           </div>
           {ui && (
             <span className="ml-auto text-xs bg-green-950 text-green-400 border border-green-900 px-2 py-0.5 rounded-full">
