@@ -42,14 +42,20 @@ type EditTarget = { day: number; act: number; field: "time" | "title" };
 
 export default function Timeline({ data }: { data: any }) {
   const [days, setDays] = useState<NormalizedDay[]>(() => normalize(data));
+  const [collapsed, setCollapsed] = useState<boolean[]>([]);
   const [editing, setEditing] = useState<EditTarget | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Reset editable state whenever the agent pushes new data
   useEffect(() => {
-    setDays(normalize(data));
+    const normalized = normalize(data);
+    setDays(normalized);
+    setCollapsed(new Array(normalized.length).fill(false));
     setEditing(null);
   }, [data]);
+
+  const toggleCollapse = (i: number) =>
+    setCollapsed((prev) => prev.map((v, idx) => (idx === i ? !v : v)));
 
   useEffect(() => {
     if (editing) inputRef.current?.focus();
@@ -79,13 +85,25 @@ export default function Timeline({ data }: { data: any }) {
     <div className="space-y-8">
       {days.map((day, i) => (
         <div key={i}>
-          <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => toggleCollapse(i)}
+            className="flex items-center gap-2 mb-4 group/header"
+          >
             <div className="bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full shrink-0">
               {day.label}
             </div>
-          </div>
+            <svg
+              width="14" height="14" viewBox="0 0 14 14" fill="none"
+              className={`text-zinc-500 group-hover/header:text-zinc-300 transition-transform duration-200 ${collapsed[i] ? "-rotate-90" : ""}`}
+            >
+              <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="text-xs text-zinc-600 group-hover/header:text-zinc-400 transition-colors">
+              {collapsed[i] ? `${day.activities.length} activities` : ""}
+            </span>
+          </button>
 
-          <div className="ml-2 border-l border-zinc-700 pl-5 space-y-4">
+          <div className={`ml-2 border-l border-zinc-700 pl-5 space-y-4 overflow-hidden transition-all duration-200 ${collapsed[i] ? "hidden" : ""}`}>
             {day.activities.map((a, j) => (
               <div key={j} className="relative group">
                 <div className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-zinc-700 border-2 border-zinc-500" />
