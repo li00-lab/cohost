@@ -1,8 +1,9 @@
 import { create } from "zustand";
 
 export interface TripTab {
-  id: string;       // destination key (lowercased), used for dedup
-  label: string;    // display name, e.g. "Singapore"
+  id: string;        // destination key (lowercased), used for dedup
+  label: string;     // display name, e.g. "Singapore"
+  sessionId: string;
   itinerary: any;
   ui: any;
 }

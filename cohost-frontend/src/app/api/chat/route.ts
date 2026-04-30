@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
           await sleep(55);
         }
 
-        send({ type: "done", itinerary, ui, destination }, controller);
+        send({ type: "done", itinerary, ui, destination, sessionId }, controller);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         console.error("[chat] Error:", message);

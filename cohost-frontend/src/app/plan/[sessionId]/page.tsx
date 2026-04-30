@@ -1,5 +1,5 @@
 import PlanApp from "@/components/PlanApp";
 
-export default function PlanPage() {
+export default function PlanSessionPage() {
   return <PlanApp />;
 }
