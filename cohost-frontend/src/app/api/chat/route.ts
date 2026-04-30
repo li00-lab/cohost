@@ -86,6 +86,9 @@ export async function POST(req: NextRequest) {
 
         const itinerary = parseJson(state.final_itinerary);
         const ui = parseJson(state.ui_schema);
+        const intent = parseJson(state.intent);
+        const destination: string =
+          (intent as any)?.destination ?? (itinerary as any)?.tripName ?? "Trip";
 
         // ── 5. Compose reply ───────────────────────────────────────────
         const name = (itinerary as any)?.tripName ?? "your trip";
@@ -102,7 +105,7 @@ export async function POST(req: NextRequest) {
           await sleep(55);
         }
 
-        send({ type: "done", itinerary, ui }, controller);
+        send({ type: "done", itinerary, ui, destination }, controller);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         console.error("[chat] Error:", message);

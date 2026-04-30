@@ -1,249 +1,120 @@
-"use client";
+import Link from "next/link";
 
-import { useState, useRef, useEffect } from "react";
-import { useCohostStore } from "@/lib/store";
-import Renderer from "@/components/Renderer";
+const features = [
+  {
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M10 2a8 8 0 100 16A8 8 0 0010 2z" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M10 6v4l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+    title: "Multi-Agent Pipeline",
+    description:
+      "Four specialist AI agents collaborate — intent parsing, itinerary planning, validation, and UI generation — all powered by Google ADK.",
+  },
+  {
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M3 10h14M3 5h14M3 15h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+    title: "Day-by-Day Itineraries",
+    description:
+      "Get realistic, timed schedules with real place names, meal breaks, and travel gaps built in — not generic bullet points.",
+  },
+  {
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M4 13l3 3 9-9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    title: "Click to Edit",
+    description:
+      "Every activity and time slot is editable inline. Swap a restaurant, shift a time, or rename a day — your plan, your way.",
+  },
+];
 
-function ChevronIcon({ open }: { open: boolean }) {
+const examples = [
+  "3-day food trip to Tokyo",
+  "5-day Paris highlights with my partner",
+  "Week-long family holiday in Bali",
+  "Weekend in Barcelona, love architecture",
+];
+
+export default function LandingPage() {
   return (
-    <svg
-      width="16" height="16" viewBox="0 0 16 16" fill="none"
-      className={`transition-transform duration-300 ${open ? "" : "rotate-180"}`}
-    >
-      <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+    <div className="min-h-screen bg-zinc-950 text-white flex flex-col">
+      {/* Nav */}
+      <nav className="flex items-center justify-between px-8 py-5 border-b border-zinc-900">
+        <span className="text-sm font-semibold tracking-tight">Cohost</span>
+        <Link
+          href="/plan"
+          className="text-sm text-zinc-400 hover:text-white transition-colors"
+        >
+          Open app →
+        </Link>
+      </nav>
 
-type Message = { role: "user" | "assistant"; content: string };
-type StreamStatus = "thinking" | "generating" | null;
+      {/* Hero */}
+      <main className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+        {/* Headline */}
+        <h1 className="text-5xl sm:text-6xl font-bold tracking-tight leading-tight max-w-2xl">
+          Your AI{" "}
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-600">
+            travel concierge
+          </span>
+        </h1>
 
-export default function HomePage() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [streamingStatus, setStreamingStatus] = useState<StreamStatus>(null);
-  const [streamingContent, setStreamingContent] = useState("");
-  const [chatOpen, setChatOpen] = useState(true);
-  const bottomRef = useRef<HTMLDivElement>(null);
+        <p className="mt-5 text-lg text-zinc-400 max-w-md leading-relaxed">
+          Describe your trip in plain English. Cohost plans every day, down to the hour.
+        </p>
 
-  const setData = useCohostStore((s) => s.setData);
-  const ui = useCohostStore((s) => s.ui);
+        {/* CTA */}
+        <Link
+          href="/plan"
+          className="mt-8 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white font-medium px-6 py-3 rounded-xl text-sm"
+        >
+          Try it free
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </Link>
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent, streamingStatus]);
-
-  const send = async () => {
-    const text = input.trim();
-    if (!text || loading) return;
-
-    setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
-    setLoading(true);
-    setStreamingContent("");
-    setStreamingStatus("thinking");
-
-    // Plain closure variable — guaranteed to hold its value for the entire
-    // async call, unlike a React ref which can be stale after state batching.
-    let accumulated = "";
-    let finalItinerary: object | null = null;
-    let finalUi: object | null = null;
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
-      });
-
-      if (!res.body) throw new Error("No response body");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-
-        const lines = buf.split("\n");
-        buf = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data:")) continue;
-          const raw = line.slice(5).trim();
-          if (!raw) continue;
-          try {
-            const event = JSON.parse(raw);
-            switch (event.type) {
-              case "status":
-                setStreamingStatus(event.value as StreamStatus);
-                break;
-              case "text":
-                accumulated += event.value;
-                setStreamingContent(accumulated);
-                break;
-              case "done":
-                finalItinerary = event.itinerary;
-                finalUi = event.ui;
-                break;
-              case "error":
-                throw new Error(event.message);
-            }
-          } catch (e) {
-            if (e instanceof Error && e.message !== "JSON parse error") throw e;
-          }
-        }
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: accumulated || "Your itinerary has been planned!",
-        },
-      ]);
-      if (finalItinerary || finalUi) {
-        setData({ itinerary: finalItinerary, ui: finalUi });
-      }
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Something went wrong. Please try again." },
-      ]);
-    } finally {
-      setStreamingStatus(null);
-      setStreamingContent("");
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex h-screen bg-zinc-950 text-white overflow-hidden">
-      {/* ── Chat panel ── */}
-      <div
-        className={`flex flex-col border-r border-zinc-800 transition-all duration-300 shrink-0 ${
-          chatOpen ? "w-[420px]" : "w-0 border-r-0 overflow-hidden"
-        }`}
-      >
-        <header className="px-6 py-4 border-b border-zinc-800 shrink-0">
-          <h1 className="text-base font-semibold tracking-tight">Cohost</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">AI Travel Planner · Google ADK</p>
-        </header>
-
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-          {messages.length === 0 && !streamingStatus && (
-            <div className="flex flex-col items-center justify-center h-full text-zinc-600 select-none">
-              <span className="text-4xl mb-3">✈️</span>
-              <p className="font-medium text-zinc-400">Ask me to plan a trip</p>
-              <p className="text-sm mt-1 text-zinc-600">"3-day food trip to Tokyo"</p>
-            </div>
-          )}
-
-          {messages.map((m, i) => (
-            <div
-              key={i}
-              className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+        {/* Example prompts */}
+        <div className="mt-10 flex flex-wrap justify-center gap-2 max-w-lg">
+          {examples.map((ex) => (
+            <Link
+              key={ex}
+              href={`/plan`}
+              className="text-xs bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors px-3 py-1.5 rounded-full"
             >
-              <div
-                className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                  m.role === "user"
-                    ? "bg-blue-600 text-white rounded-br-sm"
-                    : "bg-zinc-800 text-zinc-100 rounded-bl-sm"
-                }`}
-              >
-                {m.content}
-              </div>
+              "{ex}"
+            </Link>
+          ))}
+        </div>
+      </main>
+
+      {/* Features */}
+      <section className="px-6 pb-20 pt-8">
+        <div className="max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {features.map((f) => (
+            <div
+              key={f.title}
+              className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5"
+            >
+              <div className="text-blue-400 mb-3">{f.icon}</div>
+              <h3 className="text-sm font-semibold mb-1">{f.title}</h3>
+              <p className="text-xs text-zinc-500 leading-relaxed">{f.description}</p>
             </div>
           ))}
-
-          {/* Live streaming bubble */}
-          {streamingStatus && (
-            <div className="flex justify-start">
-              <div className="bg-zinc-800 text-zinc-100 rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed max-w-[78%]">
-                {streamingStatus === "thinking" && (
-                  <span className="flex items-center gap-2 text-yellow-400 text-xs font-medium">
-                    <span className="animate-pulse text-base leading-none">●</span>
-                    thinking...
-                  </span>
-                )}
-
-                {streamingStatus === "generating" && (
-                  <>
-                    {streamingContent && (
-                      <p className="mb-2">{streamingContent}</p>
-                    )}
-                    <span className="flex items-center gap-2 text-green-400 text-xs font-medium">
-                      <span className="animate-pulse text-base leading-none">●</span>
-                      generating response...
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div ref={bottomRef} />
         </div>
+      </section>
 
-        <div className="px-4 pb-4 pt-3 border-t border-zinc-800 shrink-0">
-          <div className="flex gap-2">
-            <input
-              className="flex-1 bg-zinc-800 text-sm rounded-xl px-4 py-2.5 outline-none placeholder:text-zinc-600 focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-              placeholder="Plan a 5-day trip to Paris…"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-              disabled={loading}
-            />
-            <button
-              onClick={send}
-              disabled={loading || !input.trim()}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-xl px-4 py-2.5 text-sm font-medium shrink-0"
-            >
-              Send
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Itinerary preview panel ── */}
-      <div className="flex flex-col flex-1 min-w-0">
-        <header className="px-6 py-4 border-b border-zinc-800 shrink-0 flex items-center gap-3">
-          {/* Collapse / expand toggle */}
-          <button
-            onClick={() => setChatOpen((o) => !o)}
-            title={chatOpen ? "Collapse chat" : "Expand chat"}
-            className="flex items-center justify-center w-7 h-7 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors shrink-0"
-          >
-            <ChevronIcon open={chatOpen} />
-          </button>
-
-          <div>
-            <h2 className="text-base font-semibold tracking-tight">Itinerary</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Click any item to edit</p>
-          </div>
-          {ui && (
-            <span className="ml-auto text-xs bg-green-950 text-green-400 border border-green-900 px-2 py-0.5 rounded-full">
-              Live
-            </span>
-          )}
-        </header>
-
-        <div className="flex-1 overflow-y-auto px-6 py-6">
-          {ui ? (
-            <Renderer schema={ui} />
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-zinc-600 select-none">
-              <span className="text-4xl mb-3">🗺️</span>
-              <p className="font-medium text-zinc-400">Your itinerary will appear here</p>
-              <p className="text-sm mt-1">Ask the planner to get started</p>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Footer */}
+      <footer className="border-t border-zinc-900 px-8 py-4 flex items-center justify-between text-xs text-zinc-600">
+        <span>Cohost · AI Travel Planner</span>
+        <span>Google ADK</span>
+      </footer>
     </div>
   );
 }
