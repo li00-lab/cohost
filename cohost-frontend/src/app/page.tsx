@@ -4,42 +4,97 @@ import { useState, useRef, useEffect } from "react";
 import { useCohostStore } from "@/lib/store";
 import Renderer from "@/components/Renderer";
 
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-};
+type Message = { role: "user" | "assistant"; content: string };
+type StreamStatus = "thinking" | "generating" | null;
 
 export default function HomePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streamingStatus, setStreamingStatus] = useState<StreamStatus>(null);
+  const [streamingContent, setStreamingContent] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+
   const setData = useCohostStore((s) => s.setData);
   const ui = useCohostStore((s) => s.ui);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, streamingContent, streamingStatus]);
 
   const send = async () => {
     const text = input.trim();
     if (!text || loading) return;
+
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setLoading(true);
+    setStreamingContent("");
+    setStreamingStatus("thinking");
+
+    // Plain closure variable — guaranteed to hold its value for the entire
+    // async call, unlike a React ref which can be stale after state batching.
+    let accumulated = "";
+    let finalItinerary: object | null = null;
+    let finalUi: object | null = null;
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
       });
-      const data = await res.json();
+
+      if (!res.body) throw new Error("No response body");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          const raw = line.slice(5).trim();
+          if (!raw) continue;
+          try {
+            const event = JSON.parse(raw);
+            switch (event.type) {
+              case "status":
+                setStreamingStatus(event.value as StreamStatus);
+                break;
+              case "text":
+                accumulated += event.value;
+                setStreamingContent(accumulated);
+                break;
+              case "done":
+                finalItinerary = event.itinerary;
+                finalUi = event.ui;
+                break;
+              case "error":
+                throw new Error(event.message);
+            }
+          } catch (e) {
+            if (e instanceof Error && e.message !== "JSON parse error") throw e;
+          }
+        }
+      }
+
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: data.reply ?? "Here's your itinerary!" },
+        {
+          role: "assistant",
+          content: accumulated || "Your itinerary has been planned!",
+        },
       ]);
-      if (data.itinerary || data.ui) {
-        setData({ itinerary: data.itinerary, ui: data.ui });
+      if (finalItinerary || finalUi) {
+        setData({ itinerary: finalItinerary, ui: finalUi });
       }
     } catch {
       setMessages((prev) => [
@@ -47,6 +102,8 @@ export default function HomePage() {
         { role: "assistant", content: "Something went wrong. Please try again." },
       ]);
     } finally {
+      setStreamingStatus(null);
+      setStreamingContent("");
       setLoading(false);
     }
   };
@@ -61,7 +118,7 @@ export default function HomePage() {
         </header>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-          {messages.length === 0 && (
+          {messages.length === 0 && !streamingStatus && (
             <div className="flex flex-col items-center justify-center h-full text-zinc-600 select-none">
               <span className="text-4xl mb-3">✈️</span>
               <p className="font-medium text-zinc-400">Ask me to plan a trip</p>
@@ -86,15 +143,32 @@ export default function HomePage() {
             </div>
           ))}
 
-          {loading && (
+          {/* Live streaming bubble */}
+          {streamingStatus && (
             <div className="flex justify-start">
-              <div className="bg-zinc-800 text-zinc-400 rounded-2xl rounded-bl-sm px-4 py-3 text-sm flex gap-1 items-center">
-                <span className="animate-bounce" style={{ animationDelay: "0ms" }}>·</span>
-                <span className="animate-bounce" style={{ animationDelay: "150ms" }}>·</span>
-                <span className="animate-bounce" style={{ animationDelay: "300ms" }}>·</span>
+              <div className="bg-zinc-800 text-zinc-100 rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed max-w-[78%]">
+                {streamingStatus === "thinking" && (
+                  <span className="flex items-center gap-2 text-yellow-400 text-xs font-medium">
+                    <span className="animate-pulse text-base leading-none">●</span>
+                    thinking...
+                  </span>
+                )}
+
+                {streamingStatus === "generating" && (
+                  <>
+                    {streamingContent && (
+                      <p className="mb-2">{streamingContent}</p>
+                    )}
+                    <span className="flex items-center gap-2 text-green-400 text-xs font-medium">
+                      <span className="animate-pulse text-base leading-none">●</span>
+                      generating response...
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           )}
+
           <div ref={bottomRef} />
         </div>
 
@@ -119,7 +193,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── A2UI Preview panel ── */}
+      {/* ── Itinerary preview panel ── */}
       <div className="flex flex-col w-1/2">
         <header className="px-6 py-4 border-b border-zinc-800 shrink-0 flex items-center">
           <div>

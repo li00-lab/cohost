@@ -99,7 +99,7 @@ ui_agent = LlmAgent(
 )
 
 # --- Sequential Pipeline ---
-cohost_agent = SequentialAgent(
+root_agent = SequentialAgent(
     name="CohostPlannerAgent",
     sub_agents=[
         intent_agent,
@@ -108,5 +108,3 @@ cohost_agent = SequentialAgent(
         ui_agent
     ],
 )
-
-root_agent = cohost_agent
